@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.png') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件上传</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        .drop-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 10px;
+            cursor: pointer;
+            background-color: #fafafa;
+        }
+
+        .drop-area:hover {
+            border-color: #28a745;
+            background-color: #f1f1f1;
+        }
+
+        .file-list {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: #fafafa;
+        }
+
+        .file-item {
+            margin: 5px 0;
+            color: #333;
+        }
+
+        input[type="text"],
+        button {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #218838;
+        }
+
+        #progressBar {
+            width: 100%;
+            background: #e0e0e0;
+            border-radius: 4px;
+            margin: 10px 0;
+            height: 20px;
+            display: none;
+        }
+
+        #progressBarFill {
+            height: 100%;
+            width: 0;
+            background: #28a745;
+            border-radius: 4px;
+        }
+
+        #statusText {
+            text-align: center;
+            margin-top: 10px;
+            color: #333;
+        }
+
+        .history-button {
+            background-color: #007bff;
+            margin-top: 20px;
+        }
+
+        .history-button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>上传文件</h1>
+        <div class="drop-area" id="dropArea">
+            点击或拖拽文件到此处上传
+            <input type="file" id="fileInput" name="files" multiple style="display: none;" required>
+        </div>
+        <div class="file-list" id="fileList"></div>
+        <label for="description">描述信息：</label>
+        <input type="text" id="description" name="description" placeholder="请输入描述">
+        <button id="uploadButton">上传文件</button>
+
+        <div id="progressBar" style="display: none;">
+            <div id="progressBarFill"></div>
+        </div>
+        <p id="statusText"></p>
+
+        <button class="history-button" onclick="window.location.href='/history'">查看历史记录</button>
+        <button class="history-button" onclick="window.location.href='/logout'">退出登录</button>
+    </div>
+
+    <script>
+        const dropArea = document.getElementById('dropArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const descriptionInput = document.getElementById('description');
+        const uploadButton = document.getElementById('uploadButton');
+        const progressBarFill = document.getElementById('progressBarFill');
+        const statusText = document.getElementById('statusText');
+        const progressBar = document.getElementById('progressBar');
+
+        dropArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        dropArea.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            dropArea.classList.add('active');
+        });
+
+        dropArea.addEventListener('dragleave', () => {
+            dropArea.classList.remove('active');
+        });
+
+        dropArea.addEventListener('drop', (event) => {
+            event.preventDefault();
+            dropArea.classList.remove('active');
+            const files = event.dataTransfer.files;
+            handleFiles(files);
+        });
+
+        fileInput.addEventListener('change', (event) => {
+            const files = event.target.files;
+            handleFiles(files);
+        });
+
+        function handleFiles(files) {
+            fileList.innerHTML = '';
+            Array.from(files).forEach(file => {
+                const fileItem = document.createElement('div');
+                fileItem.classList.add('file-item');
+                fileItem.textContent = file.name;
+                fileList.appendChild(fileItem);
+            });
+        }
+
+        uploadButton.addEventListener('click', () => {
+            const files = fileInput.files;
+            if (files.length === 0) {
+                alert('请选择至少一个文件上传');
+                return;
+            }
+
+            // 初始化上传状态
+            fileList.innerHTML = '';
+            statusText.textContent = '上传中...';
+            progressBar.style.display = 'block';
+            progressBarFill.style.width = '0%';
+
+            let totalFiles = files.length;  // 总文件数量
+            let uploadedFiles = 0;  // 已成功上传的文件数量
+
+            // 遍历所有文件并逐个上传
+            Array.from(files).forEach((file) => {
+                const fileItem = document.createElement('div');
+                fileItem.classList.add('file-item');
+                fileItem.textContent = `${file.name} - 准备上传...`;
+                fileList.appendChild(fileItem);
+
+                const xhr = new XMLHttpRequest();
+                const formData = new FormData();
+                const description = descriptionInput.value || file.name;  // 使用文件名作为描述
+
+                formData.append('files', file);  // 使用 'files' 键名进行上传
+                formData.append('description', description);  // 设置描述
+
+                xhr.onload = function () {
+                    if (xhr.status === 200) {
+                        const response = JSON.parse(xhr.responseText);
+                        if (response.status === 'success') {
+                            fileItem.textContent = `${file.name} - 上传成功！`;
+                        } else {
+                            fileItem.textContent = `${file.name} - 上传失败：${response.message}`;
+                        }
+                    } else {
+                        fileItem.textContent = `${file.name} - 上传失败，请重试。`;
+                    }
+
+                    // 每当一个文件上传完成，更新累计上传的文件数量
+                    uploadedFiles++;
+
+                    // 根据已上传文件数量更新总进度条
+                    const overallProgress = (uploadedFiles / totalFiles) * 100;
+                    progressBarFill.style.width = `${overallProgress}%`;
+
+                    // 检查是否所有文件都已上传完成
+                    if (uploadedFiles === totalFiles) {
+                        statusText.textContent = '所有文件上传完成！';
+                        progressBarFill.style.width = '100%';
+                    }
+                };
+
+                xhr.onerror = function () {
+                    fileItem.textContent = `${file.name} - 上传过程中发生错误。`;
+                    uploadedFiles++;
+
+                    // 即使上传失败，也需要更新进度条
+                    const overallProgress = (uploadedFiles / totalFiles) * 100;
+                    progressBarFill.style.width = `${overallProgress}%`;
+
+                    if (uploadedFiles === totalFiles) {
+                        statusText.textContent = '所有文件上传完成！';
+                        progressBarFill.style.width = '100%';
+                    }
+                };
+
+                xhr.open('POST', '', true);
+                xhr.send(formData);
+            });
+        });
+
+
+    </script>
+</body>
+
+</html>

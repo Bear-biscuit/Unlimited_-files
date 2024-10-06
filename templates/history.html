@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='pc.css') }}" media="screen and (min-width: 501px)">
+    <link rel="stylesheet" href="{{ url_for('static', filename='pm.css') }}" media="screen and (max-width: 500px)">
+    <title>历史记录</title>
+</head>
+
+<body>
+    <h1>上传文件历史记录</h1>
+    <ul>
+        {% for entry in history %}
+        <li>
+            {% set link = entry.link %}
+            {% set description = entry.description %}
+
+            {% set date_info = link.split('upload/')[1].split('/')[0:3] %}
+            {% set formatted_date = date_info[0] + '年' + date_info[1] + '月' + date_info[2] + '日' %}
+
+            <div class="media-preview">
+                {% set content_type = link.split('response-content-type=')[-1].split('&')[0] %}
+
+                {% if 'image' in content_type %}
+                <img src="{{ link }}" alt="图片预览">
+                {% elif 'video' in content_type %}
+                <video controls>
+                    <source src="{{ link }}" type="{{ content_type }}">
+                    您的浏览器不支持视频播放。
+                </video>
+                {% elif 'audio' in content_type %}
+                <audio controls>
+                    <source src="{{ link }}" type="{{ content_type }}">
+                    您的浏览器不支持音频播放。
+                </audio>
+                {% else %}
+                <p>不支持预览的文件</p>
+                {% endif %}
+            </div>
+            <div class="cont">
+                <div class="introduce"><strong>文件描述:</strong>
+                    <p> {{ description }}</p>
+                </div>
+                <div class="Date"><strong>上传日期:</strong> {{ formatted_date }}</div>
+            </div>
+
+            <div class="btn">
+                <button onclick="copyToClipboard('{{ link }}')">复制链接</button>
+                <button onclick="deleteRecord('{{ link }}')">删除记录</button>
+            </div>
+
+        </li>
+        {% endfor %}
+    </ul>
+
+    <!-- 分页导航 -->
+    <div class="pagination">
+        {% if page > 1 %}
+        <a href="/history?page={{ page - 1 }}">上一页</a>
+        {% endif %}
+        <span>第 {{ page }} 页，共 {{ total_pages }} 页</span>
+        {% if page < total_pages %} <a href="/history?page={{ page + 1 }}">下一页</a>
+            {% endif %}
+    </div>
+
+    <!-- 返回主页按钮 -->
+    <div class="return-home">
+        <a href="/">返回主页</a>
+    </div>
+
+    <script>
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(function () {
+                alert('链接已复制到剪贴板');
+            }, function (err) {
+                alert('复制失败，错误：' + err);
+            });
+        }
+
+        function deleteRecord(link) {
+                const xhr = new XMLHttpRequest();
+                const formData = new FormData();
+                formData.append('link', link);
+
+                xhr.onload = function () {
+                    if (xhr.status === 200) {
+                        const response = JSON.parse(xhr.responseText);
+                        if (response.status === 'success') {
+                            location.reload();  // 刷新页面以更新记录
+                        } else {
+                            alert('删除失败：' + response.message);
+                        }
+                    } else {
+                        alert('删除请求失败，请重试。');
+                    }
+                };
+
+                xhr.open('POST', '/delete', true);
+                xhr.send(formData);
+        }
+    </script>
+</body>
+
+</body>
+
+</html>
