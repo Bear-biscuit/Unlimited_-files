@@ -62,7 +62,7 @@ def upload_file(file_path, mime_type, description):
 
     with open(file_path, 'rb') as file:
         headers = {
-            'Content-Type': mime_type,
+            'Content-Type': 'image/jpeg',
             'User-Agent': get_random_user_agent()
         }
         response = requests.put(url, data=file, headers=headers)
