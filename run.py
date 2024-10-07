@@ -3,6 +3,7 @@ import tempfile
 import requests
 import random
 import json
+from tqdm import tqdm
 from flask import Flask, request, render_template, redirect, url_for, flash, session, jsonify
 
 app = Flask(__name__)
@@ -53,26 +54,60 @@ def save_link_to_file(link, description):
     with open(history_file, 'w', encoding='utf-8') as f:
         json.dump(history, f, ensure_ascii=False, indent=4)
 
-
+upload_progress = {}  # 存储文件上传进度
 # 文件上传处理
 def upload_file(file_path, mime_type, description):
     url = get_url()
     if url is None:
         return {'status': 'error', 'message': '无法获取上传地址'}
 
-    with open(file_path, 'rb') as file:
+    try:
+        # 获取文件大小
+        file_size = os.path.getsize(file_path)
         headers = {
-            'Content-Type': 'image/jpeg',
+            'Content-Type': mime_type,
             'User-Agent': get_random_user_agent()
         }
-        response = requests.put(url, data=file, headers=headers)
 
-    if response.status_code != 200:
-        return {'status': 'error', 'message': '上传失败，错误：' + response.text}
+        # 打开文件，准备以二进制流形式上传
+        with open(file_path, 'rb') as file:
+            # 进度条
+            with tqdm(total=file_size, unit='B', unit_scale=True, desc="上传进度") as progress_bar:
+                # 自定义生成器，逐块读取文件
+                def file_reader():
+                    chunk_size = 1024 * 1024  # 每次读取1MB
+                    while True:
+                        chunk = file.read(chunk_size)
+                        if not chunk:
+                            break
+                        yield chunk
+                        progress_bar.update(len(chunk))  # 更新进度条
 
-    share_link = url + '?response-content-type=' + requests.utils.quote(mime_type)
-    save_link_to_file(share_link, description)  # 保存链接和描述
-    return {'status': 'success', 'share_link': share_link}
+                # 上传文件，使用分块上传
+                response = requests.put(url, data=file_reader(), headers=headers)
+
+        # 检查上传请求的响应状态
+        if response.status_code != 200:
+            # 返回更多详细的错误提示信息
+            return {
+                'status': 'error', 
+                'message': f'上传失败，状态码：{response.status_code}，服务器返回信息：{response.text}'
+            }
+
+        # 构建文件分享链接
+        share_link = f"{url}?response-content-type={requests.utils.quote(mime_type)}"
+        save_link_to_file(share_link, description)  # 保存链接和描述
+        print(share_link)
+        return {'status': 'success', 'share_link': share_link}
+
+    except requests.exceptions.RequestException as e:
+        # 捕获网络错误等异常，并返回详细信息
+        return {
+            'status': 'error', 
+            'message': f'请求异常：{str(e)}'
+        }
+
+
 
 # 登录页面
 @app.route('/login', methods=['GET', 'POST'])
@@ -114,7 +149,7 @@ def upload():
         if len(files) == 0:
             return jsonify({'status': 'error', 'message': '文件列表为空'})
 
-        upload_results = []  # 存储每个文件的上传结果
+        # upload_results = []  # 存储每个文件的上传结果
         description = request.form.get('description', '')  # 获取描述信息，可能为空
         for file in files:
             temp_dir = tempfile.gettempdir()
@@ -129,9 +164,9 @@ def upload():
             os.remove(file_path)
 
             # 为每个文件单独生成结果
-            upload_results.append({'filename': file.filename, **result})
+            # upload_results.append({'filename': file.filename, **result})
 
-        return jsonify({'status': 'success', 'results': upload_results})
+        return jsonify({'filename': file.filename, **result})
 
     return render_template('upload.html')
 

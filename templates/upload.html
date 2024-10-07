@@ -145,7 +145,7 @@
         });
 
         dropArea.addEventListener('dragover', (event) => {
-            event.preventDefault();
+            event.preventDefault(); // 必须阻止默认行为，否则文件会在浏览器中打开
             dropArea.classList.add('active');
         });
 
@@ -156,9 +156,13 @@
         dropArea.addEventListener('drop', (event) => {
             event.preventDefault();
             dropArea.classList.remove('active');
-            const files = event.dataTransfer.files;
-            handleFiles(files);
+
+            const files = event.dataTransfer.files; // 确保从 `event.dataTransfer` 获取文件
+            if (files.length > 0) {
+                handleFiles(files);
+            }
         });
+
 
         fileInput.addEventListener('change', (event) => {
             const files = event.target.files;
@@ -166,14 +170,23 @@
         });
 
         function handleFiles(files) {
-            fileList.innerHTML = '';
+            fileList.innerHTML = ''; // 清空之前的文件列表
             Array.from(files).forEach(file => {
                 const fileItem = document.createElement('div');
                 fileItem.classList.add('file-item');
                 fileItem.textContent = file.name;
                 fileList.appendChild(fileItem);
             });
+
+            // 创建一个 DataTransfer 对象并将文件绑定到 fileInput
+            const dataTransfer = new DataTransfer();
+            Array.from(files).forEach(file => {
+                dataTransfer.items.add(file);  // 把拖拽的文件添加到 DataTransfer
+            });
+            fileInput.files = dataTransfer.files;  // 让 fileInput 具有这些文件
         }
+
+
 
         uploadButton.addEventListener('click', () => {
             const files = fileInput.files;
@@ -205,16 +218,28 @@
                 formData.append('files', file);  // 使用 'files' 键名进行上传
                 formData.append('description', description);  // 设置描述
 
+                // 上传进度事件
+                xhr.upload.onprogress = function (event) {
+                    if (event.lengthComputable) {
+                        const percentComplete = (event.loaded / event.total) * 100;
+                        // progressBarFill.style.width = `${percentComplete}%`;
+                        statusText.textContent = `上传中...`;
+                    }
+                };
+
                 xhr.onload = function () {
                     if (xhr.status === 200) {
                         const response = JSON.parse(xhr.responseText);
+                        console.log("服务器返回的响应：", response);  // 调试打印整个响应
+
                         if (response.status === 'success') {
-                            fileItem.textContent = `${file.name} - 上传成功！`;
+                            fileItem.innerHTML = `${file.name} - 上传成功！分享链接：<a href="${response.share_link}">点我查看</a>`;
                         } else {
+                            // 处理上传失败的情况
                             fileItem.textContent = `${file.name} - 上传失败：${response.message}`;
                         }
                     } else {
-                        fileItem.textContent = `${file.name} - 上传失败，请重试。`;
+                        fileItem.textContent = `${file.name} - 上传失败，状态码：${xhr.status}，错误信息：${xhr.statusText}`;
                     }
 
                     // 每当一个文件上传完成，更新累计上传的文件数量
@@ -232,7 +257,7 @@
                 };
 
                 xhr.onerror = function () {
-                    fileItem.textContent = `${file.name} - 上传过程中发生错误。`;
+                    fileItem.textContent = `${file.name} - 上传过程中发生错误。网络问题或服务器未响应。`;
                     uploadedFiles++;
 
                     // 即使上传失败，也需要更新进度条
@@ -245,10 +270,11 @@
                     }
                 };
 
-                xhr.open('POST', '', true);
+                xhr.open('POST', '/', true);  // 设置你的上传URL
                 xhr.send(formData);
             });
         });
+
 
 
     </script>
