@@ -55,17 +55,19 @@
             margin: 5px 0;
             color: #333;
         }
-
-        input[type="text"],
+        .cont {
+            display: flex;
+            flex-direction: column;
+        }
+        #description,
         button {
-            width: 100%;
             padding: 10px;
             margin: 10px 0;
             border: 1px solid #ccc;
             border-radius: 4px;
         }
-
         button {
+            width: 100%;
             background-color: #28a745;
             color: white;
             border: none;
@@ -117,10 +119,12 @@
             <input type="file" id="fileInput" name="files" multiple style="display: none;" required>
         </div>
         <div class="file-list" id="fileList"></div>
-        <label for="description">描述信息：</label>
-        <input type="text" id="description" name="description" placeholder="请输入描述">
-        <button id="uploadButton">上传文件</button>
-
+        <div class="cont">
+            <label for="description">描述信息：</label><br>
+            <input type="text" id="description" name="description" placeholder="请输入描述">
+            <button id="uploadButton">上传文件</button>
+        </div>
+    
         <div id="progressBar" style="display: none;">
             <div id="progressBarFill"></div>
         </div>
@@ -131,6 +135,8 @@
     </div>
 
     <script>
+        const CHUNK_SIZE = 1 * 1024 * 1024; // 每块大小 1MB，可以根据需要调整
+
         const dropArea = document.getElementById('dropArea');
         const fileInput = document.getElementById('fileInput');
         const fileList = document.getElementById('fileList');
@@ -145,7 +151,7 @@
         });
 
         dropArea.addEventListener('dragover', (event) => {
-            event.preventDefault(); // 必须阻止默认行为，否则文件会在浏览器中打开
+            event.preventDefault();
             dropArea.classList.add('active');
         });
 
@@ -157,12 +163,11 @@
             event.preventDefault();
             dropArea.classList.remove('active');
 
-            const files = event.dataTransfer.files; // 确保从 `event.dataTransfer` 获取文件
+            const files = event.dataTransfer.files;
             if (files.length > 0) {
                 handleFiles(files);
             }
         });
-
 
         fileInput.addEventListener('change', (event) => {
             const files = event.target.files;
@@ -170,23 +175,14 @@
         });
 
         function handleFiles(files) {
-            fileList.innerHTML = ''; // 清空之前的文件列表
+            fileList.innerHTML = '';
             Array.from(files).forEach(file => {
                 const fileItem = document.createElement('div');
                 fileItem.classList.add('file-item');
                 fileItem.textContent = file.name;
                 fileList.appendChild(fileItem);
             });
-
-            // 创建一个 DataTransfer 对象并将文件绑定到 fileInput
-            const dataTransfer = new DataTransfer();
-            Array.from(files).forEach(file => {
-                dataTransfer.items.add(file);  // 把拖拽的文件添加到 DataTransfer
-            });
-            fileInput.files = dataTransfer.files;  // 让 fileInput 具有这些文件
         }
-
-
 
         uploadButton.addEventListener('click', () => {
             const files = fileInput.files;
@@ -201,82 +197,87 @@
             progressBar.style.display = 'block';
             progressBarFill.style.width = '0%';
 
-            let totalFiles = files.length;  // 总文件数量
-            let uploadedFiles = 0;  // 已成功上传的文件数量
+            let totalFiles = files.length;
+            let uploadedFiles = 0;
 
-            // 遍历所有文件并逐个上传
             Array.from(files).forEach((file) => {
                 const fileItem = document.createElement('div');
                 fileItem.classList.add('file-item');
                 fileItem.textContent = `${file.name} - 准备上传...`;
                 fileList.appendChild(fileItem);
 
-                const xhr = new XMLHttpRequest();
+                const description = descriptionInput.value || file.name;
+
+                // 分块上传
+                uploadFileInChunks(file, description, fileItem, () => {
+                    uploadedFiles++;
+                    const overallProgress = (uploadedFiles / totalFiles) * 100;
+                    progressBarFill.style.width = `${overallProgress}%`;
+
+                    if (uploadedFiles === totalFiles) {
+                        statusText.textContent = '所有文件上传完成！';
+                        progressBarFill.style.width = '100%';
+                        fileInput.value = '';
+                        descriptionInput.value = '';
+                    }
+                });
+            });
+        });
+
+        function uploadFileInChunks(file, description, fileItem, onComplete) {
+            const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+            let currentChunk = 0;
+
+            function uploadNextChunk() {
+                const start = currentChunk * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, file.size);
+                const chunk = file.slice(start, end); // 获取当前块
+
                 const formData = new FormData();
-                const description = descriptionInput.value || file.name;  // 使用文件名作为描述
+                formData.append('file', chunk);
+                formData.append('description', description);
+                formData.append('filename', file.name);
+                formData.append('total_chunks', totalChunks);
+                formData.append('current_chunk', currentChunk);
+                formData.append('mime_type', file.type); // 传递 MIME 类型
 
-                formData.append('files', file);  // 使用 'files' 键名进行上传
-                formData.append('description', description);  // 设置描述
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', '/upload_chunk', true);
 
-                // 上传进度事件
+                // 更新每个文件的进度
                 xhr.upload.onprogress = function (event) {
                     if (event.lengthComputable) {
-                        const percentComplete = (event.loaded / event.total) * 100;
-                        // progressBarFill.style.width = `${percentComplete}%`;
-                        statusText.textContent = `上传中...`;
+                        const percentComplete = ((currentChunk + event.loaded / event.total) / totalChunks) * 100;
+                        fileItem.textContent = `${file.name} - 上传进度：${percentComplete.toFixed(2)}%`;
                     }
                 };
 
                 xhr.onload = function () {
                     if (xhr.status === 200) {
                         const response = JSON.parse(xhr.responseText);
-                        console.log("服务器返回的响应：", response);  // 调试打印整个响应
-
                         if (response.status === 'success') {
-                            fileItem.innerHTML = `${file.name} - 上传成功！分享链接：<a href="${response.share_link}">点我查看</a>`;
+                            fileItem.innerHTML = `${file.name} - 上传成功！分享链接：<a href="${response.share_link}" target="_blank">点我查看</a>`;
+                            onComplete();
+                        } else if (response.status === 'chunk_uploaded') {
+                            currentChunk++;
+                            uploadNextChunk(); // 上传下一块
                         } else {
-                            // 处理上传失败的情况
                             fileItem.textContent = `${file.name} - 上传失败：${response.message}`;
                         }
                     } else {
-                        fileItem.textContent = `${file.name} - 上传失败，状态码：${xhr.status}，错误信息：${xhr.statusText}`;
-                    }
-
-                    // 每当一个文件上传完成，更新累计上传的文件数量
-                    uploadedFiles++;
-
-                    // 根据已上传文件数量更新总进度条
-                    const overallProgress = (uploadedFiles / totalFiles) * 100;
-                    progressBarFill.style.width = `${overallProgress}%`;
-
-                    // 检查是否所有文件都已上传完成
-                    if (uploadedFiles === totalFiles) {
-                        statusText.textContent = '所有文件上传完成！';
-                        progressBarFill.style.width = '100%';
+                        fileItem.textContent = `${file.name} - 上传失败，状态码：${xhr.status}`;
                     }
                 };
 
                 xhr.onerror = function () {
-                    fileItem.textContent = `${file.name} - 上传过程中发生错误。网络问题或服务器未响应。`;
-                    uploadedFiles++;
-
-                    // 即使上传失败，也需要更新进度条
-                    const overallProgress = (uploadedFiles / totalFiles) * 100;
-                    progressBarFill.style.width = `${overallProgress}%`;
-
-                    if (uploadedFiles === totalFiles) {
-                        statusText.textContent = '所有文件上传完成！';
-                        progressBarFill.style.width = '100%';
-                    }
+                    fileItem.textContent = `${file.name} - 上传过程中发生错误。`;
                 };
 
-                xhr.open('POST', '/', true);  // 设置你的上传URL
                 xhr.send(formData);
-            });
-        });
+            }
 
-
-
+            uploadNextChunk(); // 开始上传第一块
+        }
     </script>
 </body>
 

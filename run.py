@@ -1,9 +1,9 @@
 import os
-import tempfile
 import requests
 import random
 import json
 from tqdm import tqdm
+from werkzeug.utils import secure_filename
 from flask import Flask, request, render_template, redirect, url_for, flash, session, jsonify
 
 app = Flask(__name__)
@@ -40,23 +40,106 @@ def save_link_to_file(link, description):
 
     # 如果文件不存在，创建一个空的 JSON 列表
     if not os.path.exists(history_file):
-        with open(history_file, 'w', encoding='utf-8') as f:  # 确保用 UTF-8 编码写入文件
+        with open(history_file, 'w', encoding='utf-8') as f:
             json.dump([], f)
 
-    # 读取现有的历史记录，指定 UTF-8 编码
+    # 读取现有的历史记录
     with open(history_file, 'r', encoding='utf-8') as f:
         history = json.load(f)
 
     # 添加新链接和描述信息
     history.append({'link': link, 'description': description})
 
-    # 将更新后的历史记录写回文件，确保写入时也使用 UTF-8 编码
+    # 将更新后的历史记录写回文件
     with open(history_file, 'w', encoding='utf-8') as f:
         json.dump(history, f, ensure_ascii=False, indent=4)
 
-upload_progress = {}  # 存储文件上传进度
-# 文件上传处理
-def upload_file(file_path, mime_type, description):
+def sanitize_filename(filename):
+    # 分离文件名和扩展名
+    name, ext = os.path.splitext(filename)
+    # 使用 secure_filename 处理文件名部分，但保留扩展名
+    safe_name = secure_filename(name)
+    return f"{safe_name}{ext}"
+
+# 分块上传处理
+@app.route('/upload_chunk', methods=['POST'])
+def upload_chunk():
+    if not session.get('logged_in'):
+        return jsonify({'status': 'error', 'message': '未登录'})
+
+    if 'file' not in request.files:
+        return jsonify({'status': 'error', 'message': '未找到文件'})
+
+    file = request.files['file']
+    filename = request.form.get('filename')
+    current_chunk = int(request.form.get('current_chunk'))
+    total_chunks = int(request.form.get('total_chunks'))
+    description = request.form.get('description', filename)
+    # 使用安全的文件名
+    safe_filename = sanitize_filename(filename)
+
+    # 定义临时目录路径
+    temp_dir = os.path.join('temp_chunks', safe_filename)
+    chunk_filename = os.path.join(temp_dir, f'chunk_{current_chunk}')
+
+    # 创建临时目录
+    try:
+        if not os.path.exists(temp_dir):
+            os.makedirs(temp_dir)
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': '无法创建临时目录，权限错误'})
+
+    # 保存文件块
+    try:
+        file.save(chunk_filename)
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': '无法保存文件块，权限错误'})
+
+    # 如果所有块都上传完成，合并文件
+    if current_chunk == total_chunks - 1:
+        final_file_path = os.path.join('temp_chunks', safe_filename, safe_filename)  # 指定文件名
+        try:
+            with open(final_file_path, 'wb') as final_file:
+                for i in range(total_chunks):
+                    chunk_file = os.path.join(temp_dir, f'chunk_{i}')
+
+                    # 确保每个文件块都被正确读取和合并
+                    with open(chunk_file, 'rb') as chunk:
+                        final_file.write(chunk.read())
+                    # 合并后删除块文件
+                    try:
+                        os.remove(chunk_file)
+                    except Exception as e:
+                        print(f"Error deleting chunk file: {chunk_file}, error: {e}") 
+        except Exception as e:
+            return jsonify({'status': 'error', 'message': f'无法合并文件，错误：{e}'})
+
+        # 上传文件到 OSS
+        mime_type = request.form.get('mime_type', 'application/octet-stream')
+        result = upload_file(final_file_path, mime_type, description,filename)
+
+        # 删除本地临时文件
+        try:
+            os.remove(final_file_path)
+        except Exception as e:
+            print(f"Error deleting merged file: {final_file_path}, error: {e}")
+        # 删除临时目录
+        try:
+            os.rmdir(temp_dir)
+        except Exception as e:
+            print(f"Error deleting temp directory: {temp_dir}, error: {e}")
+
+        if result['status'] == 'success':
+            return jsonify({'status': 'success', 'share_link': result['share_link']})
+        else:
+            return jsonify({'status': 'error', 'message': result['message']})
+    
+    return jsonify({'status': 'chunk_uploaded', 'message': f'第 {current_chunk + 1}/{total_chunks} 块上传成功'})
+
+
+
+# 文件上传到OSS的函数
+def upload_file(file_path, mime_type, description,filename):
     url = get_url()
     if url is None:
         return {'status': 'error', 'message': '无法获取上传地址'}
@@ -65,8 +148,9 @@ def upload_file(file_path, mime_type, description):
         # 获取文件大小
         file_size = os.path.getsize(file_path)
         headers = {
-            'Content-Type': mime_type,
-            'User-Agent': get_random_user_agent()
+            'Content-Type': 'image/jpeg',
+            'User-Agent': get_random_user_agent(),
+            'Content-Disposition': f'attachment; filename={filename}'
         }
 
         # 打开文件，准备以二进制流形式上传
@@ -97,7 +181,6 @@ def upload_file(file_path, mime_type, description):
         # 构建文件分享链接
         share_link = f"{url}?response-content-type={requests.utils.quote(mime_type)}"
         save_link_to_file(share_link, description)  # 保存链接和描述
-        print(share_link)
         return {'status': 'success', 'share_link': share_link}
 
     except requests.exceptions.RequestException as e:
@@ -137,36 +220,6 @@ def logout():
 def upload():
     if not session.get('logged_in'):
         return redirect(url_for('login'))  # 如果未登录，重定向到登录页面
-    
-    if request.method == 'POST':
-        # 检查请求中是否包含文件
-        if 'files' not in request.files:
-            return jsonify({'status': 'error', 'message': '未选择文件'})
-
-        # 获取上传的多个文件
-        files = request.files.getlist('files')  # 使用 `getlist` 以获取多个文件
-
-        if len(files) == 0:
-            return jsonify({'status': 'error', 'message': '文件列表为空'})
-
-        # upload_results = []  # 存储每个文件的上传结果
-        description = request.form.get('description', '')  # 获取描述信息，可能为空
-        for file in files:
-            temp_dir = tempfile.gettempdir()
-            file_path = os.path.join(temp_dir, file.filename)
-            file.save(file_path)
-            mime_type = file.content_type
-
-            # 使用文件名作为默认描述
-            file_description = description or file.filename
-
-            result = upload_file(file_path, mime_type, file_description)
-            os.remove(file_path)
-
-            # 为每个文件单独生成结果
-            # upload_results.append({'filename': file.filename, **result})
-
-        return jsonify({'filename': file.filename, **result})
 
     return render_template('upload.html')
 
