@@ -3,10 +3,26 @@ import requests
 import random
 import json
 from tqdm import tqdm
+import logging
 from werkzeug.utils import secure_filename
 from flask import Flask, request, render_template, redirect, url_for, flash, session, jsonify
 
 app = Flask(__name__)
+
+# 创建一个自定义日志过滤器
+class RequestFilter(logging.Filter):
+    def filter(self, record):
+        
+        # 过滤掉包含 'POST /upload_chunk' 的日志
+        if 'POST /upload_chunk' in record.getMessage():
+            return False 
+        return True  
+
+# 获取Flask默认的日志记录器
+log = logging.getLogger('werkzeug')
+
+# 添加过滤器到日志记录器
+log.addFilter(RequestFilter())
 
 app.secret_key = 'session_bMabnsuaa'
 
