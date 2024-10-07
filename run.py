@@ -4,6 +4,7 @@ import random
 import json
 from tqdm import tqdm
 import logging
+import urllib.parse
 from werkzeug.utils import secure_filename
 from flask import Flask, request, render_template, redirect, url_for, flash, session, jsonify
 
@@ -159,14 +160,14 @@ def upload_file(file_path, mime_type, description,filename):
     url = get_url()
     if url is None:
         return {'status': 'error', 'message': '无法获取上传地址'}
-
+    filename = urllib.parse.quote(filename)
     try:
         # 获取文件大小
         file_size = os.path.getsize(file_path)
         headers = {
             'Content-Type': 'image/jpeg',
             'User-Agent': get_random_user_agent(),
-            'Content-Disposition': f'attachment; filename={filename}'
+            'Content-Disposition': f'attachment; filename*=UTF-8\'\'{filename}'
         }
 
         # 打开文件，准备以二进制流形式上传
