@@ -6,6 +6,7 @@ from tqdm import tqdm
 import logging
 import urllib.parse
 from werkzeug.utils import secure_filename
+from functools import wraps
 from flask import Flask, request, render_template, redirect, url_for, flash, session, jsonify
 
 app = Flask(__name__)
@@ -330,6 +331,68 @@ def delete_record():
         json.dump(history, f, ensure_ascii=False, indent=4)
 
     return jsonify({'status': 'success', 'message': '记录已删除'})
+
+
+# 预定义的API密钥
+API_KEY = "your_api_key_here"
+
+# 从文件中加载历史链接数据
+def load_history():
+    with open('history.json', 'r', encoding='utf-8') as file:
+        return json.load(file)
+
+# 鉴权装饰器，通过URL参数验证token
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.args.get('token')  # 从URL参数中获取token
+        
+        # 检查是否提供了token
+        if not token:
+            return jsonify({"message": "Token is missing!"}), 401
+
+        # 验证Token是否正确
+        if token != API_KEY:
+            return jsonify({"message": "Invalid token!"}), 403
+        
+        return f(*args, **kwargs)
+    
+    return decorated
+
+# API路由：根据参数返回随机链接
+@app.route('/random_link', methods=['GET'])
+@token_required  # 应用鉴权
+def get_random_link():
+    # 获取可选的类型参数（img 或 video），参数必须存在
+    file_type = request.args.get('file_type')
+
+    # 如果没有传递 file_type 参数，返回错误
+    if not file_type:
+        return jsonify({"message": "file_type parameter is required. Use 'img' or 'video'."}), 400
+
+    # 加载历史数据
+    data = load_history()
+
+    # 根据 file_type 过滤数据
+    if file_type == 'img':
+        # 过滤图片类型（image/jpeg）
+        data = [item for item in data if 'response-content-type=image' in item['link']]
+    elif file_type == 'video':
+        # 过滤视频类型（video/mp4）
+        data = [item for item in data if 'response-content-type=video' in item['link']]
+    else:
+        # 如果 file_type 既不是 img 也不是 video，返回错误
+        return jsonify({"message": "Invalid file_type. Use 'img' or 'video'."}), 400
+
+    # 如果没有符合条件的内容，返回提示
+    if not data:
+        return jsonify({"message": "No links found for the given file type"}), 404
+
+    # 随机选择一个链接
+    random_item = random.choice(data)
+    
+    # 返回随机的链接和描述
+    return jsonify(random_item)
 
 
 if __name__ == '__main__':
