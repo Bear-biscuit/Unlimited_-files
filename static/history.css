@@ -1,0 +1,267 @@
+li {
+    list-style: none;
+}
+/* pc.css - 桌面端样式 */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+    margin: 0;
+    padding: 20px;
+    font-size: 16px;
+    color: #333;
+}
+
+h1 {
+    text-align: center;
+    color: #2c3e50;
+    margin-bottom: 30px;
+    font-size: 2.5em;
+}
+
+.file-categories {
+    max-width: 1200px;
+    margin: 0 auto 20px;
+}
+
+.file-categories ul {
+    display: flex;
+    justify-content: space-between;
+    background-color: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    padding: 0; /* 添加这行来移除默认的内边距 */
+    margin: 0; /* 添加这行来移除默认的外边距 */
+}
+
+.file-categories ul li {
+    flex: 1;
+    list-style-type: none; /* 确保移除列表项的默认样式 */
+}
+
+.file-categories ul li a {
+    display: block;
+    padding: 15px 0;
+    text-align: center;
+    color: #34495e;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.file-categories ul li a:hover {
+    background-color: #ecf0f1;
+}
+
+.file-categories ul li a.activeA {
+    color: #2ecc71;
+    background-color: #e8f6e9;
+}
+
+.box {
+    position: relative;
+    height: 3px;
+    background-color: #e0e0e0;
+}
+
+.active {
+    position: absolute;
+    width: 25%;
+    height: 100%;
+    background-color: #2ecc71;
+    transition: all 0.3s ease;
+}
+
+#history-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+#history-list {
+    list-style-type: none;
+    padding: 0;
+}
+
+#history-list li {
+    background-color: #fff;
+    margin-bottom: 20px;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: flex-start;
+}
+
+.media-preview {
+    flex: 0 0 300px;
+    margin-right: 20px;
+    background-color: #f1f3f5;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+}
+
+.media-preview img,
+.media-preview video,
+.media-preview audio {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.cont {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.introduce {
+    margin-bottom: 10px;
+}
+
+.introduce strong,
+.Date strong {
+    color: #7f8c8d;
+}
+
+.btn {
+    display: flex;
+    justify-content: flex-end;
+}
+
+button {
+    padding: 8px 15px;
+    margin-left: 10px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+button:hover {
+    background-color: #2980b9;
+}
+
+.pagination {
+    text-align: center;
+    margin-top: 30px;
+}
+
+.pagination a,
+.pagination span {
+    display: inline-block;
+    padding: 8px 16px;
+    margin: 0 5px;
+    background-color: #3498db;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+}
+
+.pagination a:hover {
+    background-color: #2980b9;
+}
+
+.return-home {
+    text-align: center;
+    margin-top: 30px;
+}
+
+.return-home a {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: #2ecc71;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+}
+
+.return-home a:hover {
+    background-color: #27ae60;
+}
+
+/* pm.css - 移动端样式 */
+@media screen and (max-width: 500px) {
+    body {
+        padding: 10px;
+        font-size: 14px;
+    }
+
+    h1 {
+        font-size: 1.8em;
+        margin-bottom: 20px;
+    }
+
+    .file-categories ul li a {
+        padding: 10px 0;
+        font-size: 14px;
+    }
+
+    #history-list li {
+        padding: 15px;
+        /* 移除 flex-direction: column; 使布局与桌面端一致 */
+    }
+
+    .media-preview {
+        flex: 0 0 120px; /* 调整宽度以适应移动屏幕 */
+        height: 120px;
+        margin-right: 15px; /* 添加右边距 */
+        margin-bottom: 0; /* 移除底部边距 */
+    }
+
+    .cont {
+        flex: 1; /* 允许内容区域占据剩余空间 */
+        width: auto; /* 移除固定宽度 */
+    }
+
+    .btn {
+        flex-direction: row;
+        justify-content: flex-end; /* 将按钮对齐到右侧 */
+        margin-top: 10px;
+        /* align-items: flex-end; */
+    }
+
+    button {
+        padding: 6px 10px;
+        font-size: 12px;
+        margin-left: 10px; /* 添加按钮之间的间距 */
+    }
+
+    .pagination a,
+    .pagination span {
+        padding: 6px 12px;
+        font-size: 14px;
+    }
+
+    .return-home a {
+        padding: 8px 16px;
+        font-size: 14px;
+    }
+
+    /* 为视频和音频项添加特殊样式 */
+    #history-list li.videoLi {
+        flex-direction: column;
+    }
+
+
+    .videoLi .media-preview {
+        flex: 0 0 auto;
+        width: 100%;
+        height: auto;
+        max-height: 100vh;
+        margin-right: 0;
+        margin-bottom: 15px;
+    }
+
+    .videoLi .cont,
+    .videoLi .btn {
+        width: 100%;
+    }
+}
