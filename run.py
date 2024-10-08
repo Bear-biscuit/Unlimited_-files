@@ -14,8 +14,10 @@ app = Flask(__name__)
 class RequestFilter(logging.Filter):
     def filter(self, record):
         
-        # 过滤掉包含 'POST /upload_chunk' 的日志
-        if 'POST /upload_chunk' in record.getMessage():
+        # 过滤特定的日志
+        if 'POST' in record.getMessage():
+            return False 
+        if 'GET' in record.getMessage():
             return False 
         return True  
 
@@ -27,7 +29,7 @@ log.addFilter(RequestFilter())
 
 app.secret_key = 'session_bMabnsuaa'
 
-ITEMS_PER_PAGE = 10  # 每页显示的条目数
+ITEMS_PER_PAGE = 5  # 每页显示的条目数
 
 # 硬编码用户名和密码
 USERNAME = "admin"
@@ -242,26 +244,61 @@ def upload():
 
 
 
-@app.route('/history')
-def history():
+@app.route('/api/history')
+def api_history():
     if not session.get('logged_in'):
-        return redirect(url_for('login'))  # 如果未登录，重定向到登录页面
+        return jsonify({'error': 'Unauthorized'}), 401
+
     history_file = 'history.json'
     history = []
 
     if os.path.exists(history_file):
-        with open(history_file, 'r', encoding='utf-8') as f:  # 确保以UTF-8编码读取文件
+        with open(history_file, 'r', encoding='utf-8') as f:
             history = json.load(f)
 
-    # 获取当前页码，默认页码为1
+    # 获取用户选择的文件类型和页码
+    selected_type = request.args.get('type', 'image')
     page = int(request.args.get('page', 1))
-    total_pages = (len(history) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
 
+    # 根据文件类型进行过滤
+    filtered_history = []
+    for entry in history:
+        link = entry.get('link')
+        content_type = link.split('response-content-type=')[-1].split('&')[0]
+        if 'image' in content_type:
+            entry['file_type'] = 'image'
+        elif 'video' in content_type:
+            entry['file_type'] = 'video'
+        elif 'audio' in content_type:
+            entry['file_type'] = 'audio'
+        else:
+            entry['file_type'] = 'other'
+
+        if entry['file_type'] == selected_type:
+            filtered_history.append(entry)
+
+    # 分页处理
+    total_pages = (len(filtered_history) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
     start_idx = (page - 1) * ITEMS_PER_PAGE
     end_idx = start_idx + ITEMS_PER_PAGE
-    current_page_history = history[start_idx:end_idx]
+    current_page_history = filtered_history[start_idx:end_idx]
 
-    return render_template('history.html', history=current_page_history, page=page, total_pages=total_pages)
+    return jsonify({
+        'history': current_page_history,
+        'page': page,
+        'total_pages': total_pages
+    })
+
+
+
+@app.route('/history')
+def history():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))  # 如果未登录，重定向到登录页面
+
+    return render_template('history.html')
+
+
 
 @app.route('/delete', methods=['POST'])
 def delete_record():

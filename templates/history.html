@@ -12,58 +12,33 @@
 
 <body>
     <h1>上传文件历史记录</h1>
-    <ul>
-        {% for entry in history %}
-        <li>
-            {% set link = entry.link %}
-            {% set description = entry.description %}
 
-            {% set date_info = link.split('upload/')[1].split('/')[0:3] %}
-            {% set formatted_date = date_info[0] + '年' + date_info[1] + '月' + date_info[2] + '日' %}
+    <!-- 文件分类导航 -->
+    <div class="file-categories">
+        <ul>
+            <li><a class="activeA" href="#" onclick="loadHistory('image', 1)">图片</a></li>
+            <li><a href="#" onclick="loadHistory('video', 1)">视频</a></li>
+            <li><a href="#" onclick="loadHistory('audio', 1)">音频</a></li>
+            <li><a href="#" onclick="loadHistory('other', 1)">其他文件</a></li>
+        </ul>
+        <div class="box">
+            <span class="active"></span>
+        </div>
+    </div>
 
-            <div class="media-preview">
-                {% set content_type = link.split('response-content-type=')[-1].split('&')[0] %}
 
-                {% if 'image' in content_type %}
-                <img src="{{ link }}" alt="图片预览">
-                {% elif 'video' in content_type %}
-                <video controls>
-                    <source src="{{ link }}" type="{{ content_type }}">
-                    您的浏览器不支持视频播放。
-                </video>
-                {% elif 'audio' in content_type %}
-                <audio controls>
-                    <source src="{{ link }}" type="{{ content_type }}">
-                    您的浏览器不支持音频播放。
-                </audio>
-                {% else %}
-                <p><a href="{{ link }}">不支持预览的文件</a></p>
-                {% endif %}
-            </div>
-            <div class="cont">
-                <div class="introduce"><strong>文件描述:</strong>
-                    <p> {{ description }}</p>
-                </div>
-                <div class="Date"><strong>上传日期:</strong> {{ formatted_date }}</div>
-            </div>
-
-            <div class="btn">
-                <button onclick="copyToClipboard('{{ link }}')">复制链接</button>
-                <button onclick="deleteRecord('{{ link }}')">删除记录</button>
-            </div>
-
-        </li>
-        {% endfor %}
-    </ul>
+    <!-- 文件列表 -->
+    <div id="history-container">
+        <ul id="history-list">
+            <!-- 文件内容将通过 AJAX 动态加载 -->
+        </ul>
+    </div>
 
     <!-- 分页导航 -->
     <div class="pagination">
-        {% if page > 1 %}
-        <a href="/history?page={{ page - 1 }}">上一页</a>
-        {% endif %}
-        <span>第 {{ page }} 页，共 {{ total_pages }} 页</span>
-        {% if page < total_pages %} <a href="/history?page={{ page + 1 }}">下一页</a>
-            {% endif %}
+        <a href="#" id="prev-page" onclick="changePage(-1)">上一页</a>
+        <span id="page-info">第 1 页，共 1 页</span>
+        <a href="#" id="next-page" onclick="changePage(1)">下一页</a>
     </div>
 
     <!-- 返回主页按钮 -->
@@ -72,55 +47,166 @@
     </div>
 
     <script>
-        function copyToClipboard(text) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        // 如果浏览器支持 navigator.clipboard.writeText
-        navigator.clipboard.writeText(text).then(function () {
-            alert('链接已复制到剪贴板');
-        }).catch(function (err) {
-            alert('复制失败，错误：' + err);
-        });
-    } else {
-        // 浏览器不支持 navigator.clipboard API，使用后备方案
-        var textArea = document.createElement("textarea");
-        textArea.value = text;
-        document.body.appendChild(textArea);
-        textArea.select();
-        try {
-            document.execCommand('copy');
-            alert('链接已复制到剪贴板');
-        } catch (err) {
-            alert('复制失败，错误：' + err);
-        }
-        document.body.removeChild(textArea);
-    }
-}
+        // 获取元素左边的位置
+        document.querySelector(".file-categories ul").addEventListener("click", function (e) {
+            // 获取元素的位置信息
+            const left = document.querySelector('.box').getBoundingClientRect().left
+            if (e.target.tagName == 'A') {
+                document.querySelector('.activeA').classList.remove('activeA')
+                e.target.classList.add('activeA')
+                const element = e.target
+                const rect = element.getBoundingClientRect();
+                // 获取元素相对于窗口左边的距离
+                const leftPosition = rect.left;
+                document.querySelector('.active').style.transform = `translateX(${leftPosition - +left}px)`
+            }
 
+        });
+    </script>
+
+    <script>
+
+        let currentPage = 1;
+        let currentType = 'image';
+        let totalPages = 1;
+
+        // 初次加载图片类型的第一页数据
+        loadHistory(currentType, currentPage);
+
+        // 根据文件类型和页码加载历史记录
+        function loadHistory(type, page) {
+            currentType = type;
+            currentPage = page;
+
+            // 发起 AJAX 请求，获取数据
+            let xhr = new XMLHttpRequest();
+            xhr.open('GET', '/api/history?type=' + type + '&page=' + page, true);
+            xhr.onload = function () {
+                if (xhr.status === 200) {
+                    let response = JSON.parse(xhr.responseText);
+                    updateHistory(response.history, response.page, response.total_pages);
+                } else {
+                    alert('加载历史记录失败');
+                }
+            };
+            xhr.send();
+        }
+
+        function updateHistory(history, page, total) {
+            var historyList = document.getElementById('history-list');
+            historyList.innerHTML = '';  // 清空列表
+
+            history.forEach(function (entry) {
+                var li = document.createElement('li');
+                var content = '';
+                var link = entry.link || '';  // 确保 link 存在
+
+                // 安全地处理文件类型
+                if (link && link.includes('response-content-type=')) {
+                    var contentType = link.split('response-content-type=')[1].split('&')[0];
+                } else {
+                    contentType = 'unknown';  // 如果没有内容类型，默认为 unknown
+                }
+
+                // 提取上传日期
+                var uploadDate = '未知日期';
+                if (link && link.includes('/upload/')) {
+                    var dateParts = link.split('/upload/')[1].split('/');
+                    if (dateParts.length >= 3) {
+                        uploadDate = `${dateParts[0]}年${dateParts[1]}月${dateParts[2]}日`;
+                    }
+                }
+
+                // 根据文件类型进行展示
+                if (contentType.includes('image')) {
+                    content = '<img src="' + link + '" alt="图片预览">';
+                } else if (contentType.includes('video')) {
+                    li.classList.add('videoLi')
+                    content = '<video controls><source src="' + link + '" type="' + contentType + '">您的浏览器不支持视频播放。</video>';
+                } else if (contentType.includes('audio')) {
+                    li.classList.add('videoLi')
+                    document.querySelector('.videoLi') && document.querySelector('.videoLi').classList.remove('videoLi')
+                    content = '<audio controls><source src="' + link + '" type="' + contentType + '">您的浏览器不支持音频播放。</audio>';
+                } else {
+                    document.querySelector('.videoLi') && document.querySelector('.videoLi').classList.remove('videoLi')
+                    content = '<p><a href="' + link + '">不支持预览的文件</a></p>';
+                }
+
+                li.innerHTML = `
+            <div class="media-preview">${content}</div>
+            <div class="cont">
+                <div class="introduce"><strong>文件描述:</strong> <p>${entry.description || '无描述'}</p></div>
+                <div class="Date"><strong>上传日期:</strong> ${uploadDate}</div>
+            </div>
+            <div class="btn">
+                <button onclick="copyToClipboard('${link}')">复制链接</button>
+                <button onclick="deleteRecord('${link}')">删除记录</button>
+            </div>`;
+                historyList.appendChild(li);
+            });
+
+            // 更新分页信息
+            document.getElementById('page-info').textContent = '第 ' + page + ' 页，共 ' + total + ' 页';
+            totalPages = total;
+
+            // 控制分页按钮
+            document.getElementById('prev-page').style.display = (page > 1) ? 'inline' : 'none';
+            document.getElementById('next-page').style.display = (page < total) ? 'inline' : 'none';
+        }
+
+
+        // 翻页功能
+        function changePage(direction) {
+            let newPage = currentPage + direction;
+            if (newPage >= 1 && newPage <= totalPages) {
+                loadHistory(currentType, newPage);
+            }
+        }
+
+        function copyToClipboard(text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function () {
+                    alert('链接已复制到剪贴板');
+                }).catch(function (err) {
+                    alert('复制失败，错误：' + err);
+                });
+            } else {
+                let textArea = document.createElement("textarea");
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    alert('链接已复制到剪贴板');
+                } catch (err) {
+                    alert('复制失败，错误：' + err);
+                }
+                document.body.removeChild(textArea);
+            }
+        }
 
         function deleteRecord(link) {
-                const xhr = new XMLHttpRequest();
-                const formData = new FormData();
-                formData.append('link', link);
+            const xhr = new XMLHttpRequest();
+            const formData = new FormData();
+            formData.append('link', link);
 
-                xhr.onload = function () {
-                    if (xhr.status === 200) {
-                        const response = JSON.parse(xhr.responseText);
-                        if (response.status === 'success') {
-                            location.reload();  // 刷新页面以更新记录
-                        } else {
-                            alert('删除失败：' + response.message);
-                        }
+            xhr.onload = function () {
+                if (xhr.status === 200) {
+                    const response = JSON.parse(xhr.responseText);
+                    if (response.status === 'success') {
+                        location.reload();  // 刷新页面以更新记录
                     } else {
-                        alert('删除请求失败，请重试。');
+                        alert('删除失败：' + response.message);
                     }
-                };
+                } else {
+                    alert('删除请求失败，请重试。');
+                }
+            };
 
-                xhr.open('POST', '/delete', true);
-                xhr.send(formData);
+            xhr.open('POST', '/delete', true);
+            xhr.send(formData);
         }
     </script>
-</body>
-
 </body>
 
 </html>
