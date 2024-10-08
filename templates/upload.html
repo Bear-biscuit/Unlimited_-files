@@ -1,141 +1,186 @@
 <!DOCTYPE html>
 <html lang="zh">
-
 <head>
     <meta charset="UTF-8">
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.png') }}">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>文件上传</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
+        :root {
+            --primary-color: #4a90e2;
+            --secondary-color: #f5f7fa;
+            --text-color: #333;
+            --border-color: #e0e0e0;
+            --error-color: #e74c3c;
+        }
+
+        * {
+            box-sizing: border-box;
             margin: 0;
-            padding: 20px;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+            line-height: 1.6;
         }
 
         .container {
-            max-width: 600px;
-            margin: auto;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
 
         h1 {
             text-align: center;
-            color: #333;
+            color: var(--primary-color);
+            margin-bottom: 2rem;
+            font-weight: 300;
         }
 
         .drop-area {
-            border: 2px dashed #ccc;
-            border-radius: 8px;
-            padding: 20px;
+            border: 2px dashed var(--primary-color);
+            border-radius: 10px;
+            padding: 2rem;
             text-align: center;
-            margin-bottom: 10px;
             cursor: pointer;
-            background-color: #fafafa;
+            transition: all 0.3s ease;
         }
 
-        .drop-area:hover {
-            border-color: #28a745;
-            background-color: #f1f1f1;
+        .drop-area:hover, .drop-area.active {
+            background-color: rgba(74, 144, 226, 0.1);
+        }
+
+        .drop-area p {
+            font-size: 1.2rem;
+            color: var(--primary-color);
         }
 
         .file-list {
-            margin: 10px 0;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            background: #fafafa;
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background-color: var(--secondary-color);
+            border-radius: 5px;
         }
 
         .file-item {
-            margin: 5px 0;
-            color: #333;
-        }
-        .cont {
+            background-color: #ffffff;
+            padding: 0.5rem 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
             display: flex;
-            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
         }
-        #description,
-        button {
-            padding: 10px;
-            margin: 10px 0;
-            border: 1px solid #ccc;
-            border-radius: 4px;
+
+        .file-item.error {
+            background-color: #ffebee;
         }
-        button {
+
+        .upload-controls {
+            margin-top: 1.5rem;
+        }
+
+        input[type="text"], button {
             width: 100%;
-            background-color: #28a745;
-            color: white;
+            padding: 0.8rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: #ffffff;
             border: none;
             cursor: pointer;
+            transition: background-color 0.3s ease;
         }
 
         button:hover {
-            background-color: #218838;
+            background-color: #3a7bc8;
         }
 
         #progressBar {
-            width: 100%;
-            background: #e0e0e0;
-            border-radius: 4px;
-            margin: 10px 0;
-            height: 20px;
-            display: none;
+            height: 10px;
+            background-color: var(--secondary-color);
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 1rem;
         }
 
         #progressBarFill {
             height: 100%;
             width: 0;
-            background: #28a745;
-            border-radius: 4px;
+            background-color: var(--primary-color);
+            transition: width 0.3s ease;
+        }
+
+        #progressBarFill.error {
+            background-color: var(--error-color);
         }
 
         #statusText {
             text-align: center;
-            margin-top: 10px;
-            color: #333;
+            margin-top: 1rem;
+            font-weight: bold;
         }
 
         .history-button {
-            background-color: #007bff;
-            margin-top: 20px;
+            background-color: #6c757d;
+            margin-top: 1rem;
         }
 
         .history-button:hover {
-            background-color: #0056b3;
+            background-color: #5a6268;
+        }
+
+        #retryButton {
+            background-color: var(--error-color);
+            display: none;
+            margin-top: 1rem;
+        }
+
+        #retryButton:hover {
+            background-color: #c0392b;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 1rem;
+            }
         }
     </style>
 </head>
-
 <body>
     <div class="container">
-        <h1>上传文件</h1>
+        <h1>文件上传</h1>
         <div class="drop-area" id="dropArea">
-            点击或拖拽文件到此处上传
+            <p>点击或拖拽文件到此处上传</p>
             <input type="file" id="fileInput" name="files" multiple style="display: none;" required>
         </div>
         <div class="file-list" id="fileList"></div>
-        <div class="cont">
-            <label for="description">描述信息：</label><br>
-            <input type="text" id="description" name="description" placeholder="请输入描述">
+        <div class="upload-controls">
+            <input type="text" id="description" name="description" placeholder="请输入描述信息">
             <button id="uploadButton">上传文件</button>
         </div>
-    
         <div id="progressBar" style="display: none;">
             <div id="progressBarFill"></div>
         </div>
         <p id="statusText"></p>
-
+        <button id="retryButton" style="display: none;">重试失败的文件</button>
         <button class="history-button" onclick="window.location.href='/history'">查看历史记录</button>
         <button class="history-button" onclick="window.location.href='/logout'">退出登录</button>
     </div>
 
     <script>
-        const CHUNK_SIZE = 1 * 1024 * 1024; // 每块大小 1MB，可以根据需要调整
+        const CHUNK_SIZE = 1 * 1024 * 1024;
 
         const dropArea = document.getElementById('dropArea');
         const fileInput = document.getElementById('fileInput');
@@ -145,6 +190,9 @@
         const progressBarFill = document.getElementById('progressBarFill');
         const statusText = document.getElementById('statusText');
         const progressBar = document.getElementById('progressBar');
+        const retryButton = document.getElementById('retryButton');
+
+        let failedFiles = [];
 
         dropArea.addEventListener('click', () => {
             fileInput.click();
@@ -191,16 +239,27 @@
                 return;
             }
 
-            // 初始化上传状态
+            uploadFiles(Array.from(files));
+        });
+
+        retryButton.addEventListener('click', () => {
+            uploadFiles(failedFiles);
+        });
+
+        function uploadFiles(files) {
             fileList.innerHTML = '';
             statusText.textContent = '上传中...';
             progressBar.style.display = 'block';
             progressBarFill.style.width = '0%';
+            progressBarFill.classList.remove('error');
+            retryButton.style.display = 'none';
+            failedFiles = [];
 
             let totalFiles = files.length;
             let uploadedFiles = 0;
+            let failedUploads = 0;
 
-            Array.from(files).forEach((file) => {
+            files.forEach((file) => {
                 const fileItem = document.createElement('div');
                 fileItem.classList.add('file-item');
                 fileItem.textContent = `${file.name} - 准备上传...`;
@@ -208,21 +267,30 @@
 
                 const description = descriptionInput.value || file.name;
 
-                // 分块上传
-                uploadFileInChunks(file, description, fileItem, () => {
+                uploadFileInChunks(file, description, fileItem, (success) => {
                     uploadedFiles++;
+                    if (!success) {
+                        failedUploads++;
+                        failedFiles.push(file);
+                        fileItem.classList.add('error');
+                    }
                     const overallProgress = (uploadedFiles / totalFiles) * 100;
                     progressBarFill.style.width = `${overallProgress}%`;
 
                     if (uploadedFiles === totalFiles) {
-                        statusText.textContent = '所有文件上传完成！';
-                        progressBarFill.style.width = '100%';
+                        if (failedUploads > 0) {
+                            statusText.textContent = `上传完成，${failedUploads}个文件失败`;
+                            progressBarFill.classList.add('error');
+                            retryButton.style.display = 'block';
+                        } else {
+                            statusText.textContent = '所有文件上传成功！';
+                        }
                         fileInput.value = '';
                         descriptionInput.value = '';
                     }
                 });
             });
-        });
+        }
 
         function uploadFileInChunks(file, description, fileItem, onComplete) {
             const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
@@ -231,7 +299,7 @@
             function uploadNextChunk() {
                 const start = currentChunk * CHUNK_SIZE;
                 const end = Math.min(start + CHUNK_SIZE, file.size);
-                const chunk = file.slice(start, end); // 获取当前块
+                const chunk = file.slice(start, end);
 
                 const formData = new FormData();
                 formData.append('file', chunk);
@@ -239,12 +307,11 @@
                 formData.append('filename', file.name);
                 formData.append('total_chunks', totalChunks);
                 formData.append('current_chunk', currentChunk);
-                formData.append('mime_type', file.type); // 传递 MIME 类型
+                formData.append('mime_type', file.type);
 
                 const xhr = new XMLHttpRequest();
                 xhr.open('POST', '/upload_chunk', true);
 
-                // 更新每个文件的进度
                 xhr.upload.onprogress = function (event) {
                     if (event.lengthComputable) {
                         const percentComplete = ((currentChunk + event.loaded / event.total) / totalChunks) * 100;
@@ -257,28 +324,30 @@
                         const response = JSON.parse(xhr.responseText);
                         if (response.status === 'success') {
                             fileItem.innerHTML = `${file.name} - 上传成功！分享链接：<a href="${response.share_link}" target="_blank">点我查看</a>`;
-                            onComplete();
+                            onComplete(true);
                         } else if (response.status === 'chunk_uploaded') {
                             currentChunk++;
-                            uploadNextChunk(); // 上传下一块
+                            uploadNextChunk();
                         } else {
                             fileItem.textContent = `${file.name} - 上传失败：${response.message}`;
+                            onComplete(false);
                         }
                     } else {
                         fileItem.textContent = `${file.name} - 上传失败，状态码：${xhr.status}`;
+                        onComplete(false);
                     }
                 };
 
                 xhr.onerror = function () {
                     fileItem.textContent = `${file.name} - 上传过程中发生错误。`;
+                    onComplete(false);
                 };
 
                 xhr.send(formData);
             }
 
-            uploadNextChunk(); // 开始上传第一块
+            uploadNextChunk();
         }
     </script>
 </body>
-
 </html>

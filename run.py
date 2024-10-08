@@ -36,11 +36,21 @@ USERNAME = "admin"
 PASSWORD = "password"
 
 # 获取上传地址的函数
-def get_url():
-    response = requests.get('https://video-oss.vercel.app/link')
-    if response.status_code != 200:
-        return None
-    return response.text.strip()
+import time
+
+def get_url(max_retries=3, retry_delay=1):
+    for attempt in range(max_retries):
+        try:
+            response = requests.get('https://video-oss.vercel.app/link', timeout=5)
+            if response.status_code == 200:
+                return response.text.strip()
+        except requests.RequestException:
+            pass
+        
+        if attempt < max_retries - 1:
+            time.sleep(retry_delay)
+    
+    return None
 
 # 生成随机 User-Agent
 def get_random_user_agent():
@@ -161,7 +171,7 @@ def upload_chunk():
 def upload_file(file_path, mime_type, description,filename):
     url = get_url()
     if url is None:
-        return {'status': 'error', 'message': '无法获取上传地址'}
+        return {'status': 'error', 'message': '无法获取上传地址(请稍后重试)'}
     filename = urllib.parse.quote(filename)
     try:
         # 获取文件大小
