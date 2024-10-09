@@ -206,13 +206,13 @@ button:hover {
 
     #history-list li {
         padding: 15px;
-        /* 移除 flex-direction: column; 使布局与桌面端一致 */
+        flex-direction: column;
     }
 
     .media-preview {
         flex: 0 0 120px; /* 调整宽度以适应移动屏幕 */
         height: 120px;
-        margin-right: 15px; /* 添加右边距 */
+        margin: auto;
         margin-bottom: 0; /* 移除底部边距 */
     }
 
@@ -260,8 +260,8 @@ button:hover {
         margin-bottom: 15px;
     }
 
-    .videoLi .cont,
-    .videoLi .btn {
+    .cont,
+    .btn {
         width: 100%;
     }
 }
