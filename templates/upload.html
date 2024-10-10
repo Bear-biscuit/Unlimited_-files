@@ -193,6 +193,7 @@
         const retryButton = document.getElementById('retryButton');
 
         let failedFiles = [];
+        let droppedFiles = []; // 新增：存储拖拽的文件
 
         dropArea.addEventListener('click', () => {
             fileInput.click();
@@ -213,18 +214,19 @@
 
             const files = event.dataTransfer.files;
             if (files.length > 0) {
-                handleFiles(files);
+                droppedFiles = Array.from(files); // 存储拖拽的文件
+                handleFiles(droppedFiles);
             }
         });
 
         fileInput.addEventListener('change', (event) => {
-            const files = event.target.files;
-            handleFiles(files);
+            droppedFiles = Array.from(event.target.files); // 更新拖拽文件数组
+            handleFiles(droppedFiles);
         });
 
         function handleFiles(files) {
             fileList.innerHTML = '';
-            Array.from(files).forEach(file => {
+            files.forEach(file => {
                 const fileItem = document.createElement('div');
                 fileItem.classList.add('file-item');
                 fileItem.textContent = file.name;
@@ -233,13 +235,13 @@
         }
 
         uploadButton.addEventListener('click', () => {
-            const files = fileInput.files;
+            const files = droppedFiles.length > 0 ? droppedFiles : Array.from(fileInput.files);
             if (files.length === 0) {
                 alert('请选择至少一个文件上传');
                 return;
             }
 
-            uploadFiles(Array.from(files));
+            uploadFiles(files);
         });
 
         retryButton.addEventListener('click', () => {
